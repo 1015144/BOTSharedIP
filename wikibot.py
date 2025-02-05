@@ -1,12 +1,14 @@
 import pywikibot
 import json
 import pywikibot.page
+import pywikibot.site
 import requests
+from pywikibot import pagegenerators
 from html.parser import HTMLParser
 
 sf = ["school", "college", "learn", "district", "university", "intermediate unit", "escuela"]
-corpf = ["electric", "plumb", "corporation", "llc", " inc", "corp", "consult", "agency", "group", "finance"]
-corpexclude = ["verizon", "tele", "phone", "internet", "com", "network", "bell", "at&t", "broad", "psinet", "spacex services, inc", "hurricane electric", "cable", "zayo", "cogeco", "iboss", "arvig", "crown castle fiber llc", "wireless", "service provider", "fiber", "wideopenwest"]
+corpf = ["plumb", "corporation", "llc", " inc", "corp", "consult", "agency", "group", "finance", "health"]
+corpexclude = ["verizon", "tele", "phone", "internet", "com", "network", "bell", "at&t", "broad", "psinet", "spacex services, inc", "hurricane electric", "cable", "zayo", "cogeco", "iboss", "arvig", "crown castle fiber llc", "wireless", "service provider", "fiber", "wideopenwest", "login, inc.", "knowlogy, inc", "tachus infrastructure llc", "telstra", "victoria electric cooperative"]
 govf = ["city", "government", "state", "province", "department", "county", "town", "agency", "division"]
 
 alreadyflagged = ["{shared ip", "{sharedip", "{schoolip", "{anonblock", "{whois"]
@@ -23,8 +25,7 @@ def user_checks(ip, type, check):
     t = requests.get(f"https://en.wikipedia.org/w/index.php?title=User_talk:{ip}&action=raw")
     warned = not (t.status_code == 404)
     if bad_user != -1 and warned and flagged:
-        unflagged.append([ip, check, f"https://en.wikipedia.org/wiki/Special:Contributions/{ip}"])
-        print(unflagged)
+        unflagged.append([ip, check, f"https://en.wikipedia.org/wiki/Special:Contributions/{ip}", type])
 
 def get_ip_data(ip):
     x = requests.get(f"https://whois-referral.toolforge.org/gateway.py?lookup=true&ip={ip}&format=json")
@@ -41,7 +42,6 @@ def get_ip_data(ip):
     except:
         check2 = "0"
     
-    print(ip, check1, check2)
     #EDU
     if any(elem in check1 for elem in sf):
         user_checks(ip, "edu", check1)
@@ -58,7 +58,7 @@ def get_ip_data(ip):
     elif any(elem in check2 for elem in govf) and not (any(elem in check2 for elem in corpexclude)):
         user_checks(ip, "gov", check2)
 
-u = requests.get(f"https://en.wikipedia.org/w/index.php?damaging=likelybad%3Bverylikelybad&goodfaith=likelybad%3Bverylikelybad&userExpLevel=unregistered&hidebots=1&hidecategorization=1&hideWikibase=1&hidenewuserlog=1&limit=500&days=7&title=Special:RecentChanges&urlversion=2")
+u = requests.get(f"https://en.wikipedia.org/w/index.php?damaging=likelybad%3Bverylikelybad&goodfaith=likelybad%3Bverylikelybad&userExpLevel=unregistered&hidebots=1&hidecategorization=1&hideWikibase=1&hidenewuserlog=1&limit=20&days=7&title=Special:RecentChanges&urlversion=2")
 
 from html.parser import HTMLParser
 from html.entities import name2codepoint
@@ -74,4 +74,13 @@ try:
     parser.feed(u.text)
 except:
     print("Session done (or failed)")
-print(unflagged)
+    
+for a in unflagged:
+    page = f"User_talk:{a[0]}"
+    summary = f"Add shared IP {a[3]} alert."
+    content = "{{Shared IP " + a[3] + "|" + a[1].title() + "}}"
+    bot = ""
+    site = pywikibot.Site('en', 'wikipedia') 
+    page = pywikibot.Page(site, page)
+    print(content + "\n" + page.text)
+    page.save(summary)
